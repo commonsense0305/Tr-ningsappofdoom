@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Träning">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>Träningsprogress</title>
+  <style>
+    :root{--bg:#f4f5f7;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--accent2:#1d4ed8;--green:#15803d;--red:#dc2626}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif}
+    header{position:sticky;top:0;z-index:5;padding:calc(env(safe-area-inset-top) + 14px) 18px 14px;background:rgba(17,24,39,.96);color:white}
+    .title{font-size:24px;font-weight:800}.subtitle{font-size:13px;color:#cbd5e1;margin-top:3px}
+    main{max-width:720px;margin:auto;padding:14px 14px 100px}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;background:#e5e7eb;padding:4px;border-radius:13px;margin-bottom:14px}
+    .tab{border:0;border-radius:10px;padding:10px;background:transparent;font-weight:700;color:#4b5563}.tab.active{background:#fff;color:var(--accent);box-shadow:0 1px 4px #0001}
+    .section-title{font-size:15px;color:var(--muted);font-weight:700;margin:8px 3px 10px}.card{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:15px;margin-bottom:11px;box-shadow:0 2px 10px #00000008}
+    .exercise-head{display:flex;justify-content:space-between;gap:12px}.exercise-name{font-size:17px;font-weight:750}.target{font-size:12px;color:var(--muted);margin-top:3px}
+    .weight{display:flex;align-items:center;gap:6px}.weight input{width:72px;font-size:18px;font-weight:750;text-align:right;padding:7px;border:1px solid var(--line);border-radius:9px}
+    .kg{color:var(--muted);font-size:13px}.sets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:13px}.set label{display:block;text-align:center;font-size:11px;color:var(--muted);margin-bottom:4px}.set input{width:100%;padding:11px 6px;text-align:center;font-size:17px;border:1px solid var(--line);border-radius:10px}
+    button.primary{width:100%;border:0;background:var(--accent);color:white;font-size:16px;font-weight:750;border-radius:13px;padding:14px;margin-top:5px}.primary:active{background:var(--accent2)}
+    .nav{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);border-top:1px solid var(--line);padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);display:grid;grid-template-columns:repeat(3,1fr);z-index:6}.nav button{border:0;background:none;color:#6b7280;font-size:11px;font-weight:700;padding:5px}.nav button.active{color:var(--accent)}.nav span{display:block;font-size:22px;margin-bottom:2px}
+    .row{display:flex;justify-content:space-between;gap:12px;align-items:center}.big{font-size:27px;font-weight:800}.muted{color:var(--muted)}.pill{padding:5px 9px;border-radius:999px;background:#eff6ff;color:var(--accent);font-size:12px;font-weight:700}.up{color:var(--green);font-weight:750}.down{color:var(--red);font-weight:750}
+    .empty{text-align:center;padding:35px 15px;color:var(--muted)}.log{padding:12px 0;border-bottom:1px solid var(--line)}.log:last-child{border-bottom:0}.small{font-size:12px;color:var(--muted)}
+    .danger{border:1px solid #fecaca;background:#fff;color:var(--red);border-radius:10px;padding:11px;width:100%;font-weight:700;margin-top:12px}
+  </style>
+</head>
+<body>
+<header><div class="title">TRÄNINGSPROGRESS</div><div class="subtitle" id="headerSub">Pass A · Bröst / axlar / triceps</div></header>
+<main id="app"></main>
+<nav class="nav">
+  <button id="navTrain" class="active" onclick="setPage('train')"><span>🏋️</span>Träna</button>
+  <button id="navHistory" onclick="setPage('history')"><span>🕘</span>Historik</button>
+  <button id="navOverview" onclick="setPage('overview')"><span>📈</span>Översikt</button>
+</nav>
+<script>
+const KEY='traningsprogress-v1';
+const workouts={
+ A:{name:'Pass A',group:'Bröst / axlar / triceps',ex:[
+  ['Lutande hantelpress','8–12',16],['Hantelpress','8–10',20],['Axelpress (maskin #10)','10–15',20],
+  ['Sidolyft (Lateral raises)','10–15',8],['Pecdec (maskin #10)','8–12',15],['Tricep pushdown','8–12',25]]},
+ B:{name:'Pass B',group:'Rygg / axlar',ex:[
+  ['Brett latsdrag','8–12',55],['Smalt latsdrag','10–12',50],['Kabelrodd (bred stång)','8–12',40],
+  ['Reverse pecdec','10–15',15],['Hammer curl','8–12',20],['Preacher curl','8–12',17.5]]},
+ C:{name:'Pass C',group:'Ben / mage',ex:[
+  ['Maskin #12','8–12',40],['Maskin #2','8–12',40],['Maskin #3','10–15',35],
+  ['Maskin #4','10–15',80],['Maskin #1','10–15',110],['Hack squat','10–15',110]]}
+};
+let data=JSON.parse(localStorage.getItem(KEY)||'null');
+if(!data){
+ data={exercises:{},logs:[],sessions:[]};
+ Object.entries(workouts).forEach(([w,o])=>o.ex.forEach((e,i)=>data.exercises[w+'-'+i]={workout:w,name:e[0],target:e[1],start:e[2],weight:e[2]}));
+ save();
+}
+let page='train', activeWorkout='A', reps={};
+
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+function fmt(n){return Number.isInteger(n)?String(n):String(n).replace('.',',')}
+function dateStr(d){return new Date(d).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'})}
+function setPage(p){page=p;render()}
+function setWorkout(w){activeWorkout=w;render()}
+function updateWeight(id,v){
+ const n=Number(String(v).replace(',','.')); if(!Number.isFinite(n)) return;
+ const e=data.exercises[id]; if(e.weight===n)return;
+ const old=e.weight;e.weight=n;
+ data.logs.unshift({date:Date.now(),workout:e.workout,name:e.name,old,newWeight:n,change:n-old});
+ save();
+}
+function render(){
+ document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+ document.getElementById('nav'+page[0].toUpperCase()+page.slice(1)).classList.add('active');
+ if(page==='train')renderTrain(); else if(page==='history')renderHistory(); else renderOverview();
+}
+function renderTrain(){
+ const o=workouts[activeWorkout];document.getElementById('headerSub').textContent=o.name+' · '+o.group;
+ let h='<div class="tabs">';
+ for(const w of ['A','B','C'])h+=`<button class="tab ${w===activeWorkout?'active':''}" onclick="setWorkout('${w}')">Pass ${w}</button>`;
+ h+='</div><div class="section-title">'+o.group+'</div>';
+ o.ex.forEach((x,i)=>{
+  const id=activeWorkout+'-'+i,e=data.exercises[id],r=reps[id]||['','',''];
+  h+=`<div class="card"><div class="exercise-head"><div><div class="exercise-name">${x[0]}</div><div class="target">Mål: ${x[1]} reps</div></div>
+  <div class="weight"><input inputmode="decimal" value="${fmt(e.weight)}" onchange="updateWeight('${id}',this.value)"><span class="kg">kg</span></div></div>
+  <div class="sets">${[0,1,2].map(j=>`<div class="set"><label>SET ${j+1}</label><input inputmode="numeric" value="${r[j]}" placeholder="reps" onchange="setRep('${id}',${j},this.value)"></div>`).join('')}</div></div>`;
+ });
+ h+='<button class="primary" onclick="saveSession()">✓ Spara pass</button>';
+ document.getElementById('app').innerHTML=h;
+}
+function setRep(id,j,v){if(!reps[id])reps[id]=['','',''];reps[id][j]=v}
+function saveSession(){
+ const sets={};Object.entries(reps).forEach(([id,r])=>{if(r.some(Boolean))sets[id]=r});
+ data.sessions.unshift({date:Date.now(),workout:activeWorkout,sets});save();
+ reps={}; alert('Passet är sparat ✓');render();
+}
+function renderHistory(){
+ document.getElementById('headerSub').textContent='Viktändringar och sparade pass';
+ let h='<div class="section-title">VIKTLOGG</div><div class="card">';
+ if(!data.logs.length)h+='<div class="empty">Inga viktändringar ännu.<br>Ändra vikten på en övning så loggas det automatiskt.</div>';
+ data.logs.forEach(l=>h+=`<div class="log"><div class="row"><div><b>${l.name}</b><div class="small">${workouts[l.workout].name} · ${dateStr(l.date)}</div></div><div style="text-align:right"><b>${fmt(l.old)} → ${fmt(l.newWeight)} kg</b><div class="${l.change>0?'up':'down'}">${l.change>0?'+':''}${fmt(l.change)} kg</div></div></div></div>`);
+ h+='</div><div class="section-title">SPARADE PASS</div><div class="card">';
+ if(!data.sessions.length)h+='<div class="empty">Inga sparade pass ännu.</div>';
+ data.sessions.forEach(s=>h+=`<div class="log row"><b>${workouts[s.workout].name}</b><span class="small">${dateStr(s.date)}</span></div>`);
+ h+='</div><button class="danger" onclick="resetData()">Återställ all data</button>';
+ document.getElementById('app').innerHTML=h;
+}
+function renderOverview(){
+ document.getElementById('headerSub').textContent='Startvikt och aktuell vikt';
+ let h='';
+ for(const w of ['A','B','C']){
+  h+=`<div class="section-title">${workouts[w].name} · ${workouts[w].group}</div><div class="card">`;
+  workouts[w].ex.forEach((x,i)=>{const e=data.exercises[w+'-'+i],d=e.weight-e.start;
+   h+=`<div class="log row"><div><b>${e.name}</b><div class="small">${e.target} reps · Start ${fmt(e.start)} kg</div></div><div style="text-align:right"><b>${fmt(e.weight)} kg</b>${d?`<div class="${d>0?'up':'down'}">${d>0?'+':''}${fmt(d)} kg</div>`:''}</div></div>`;
+  });h+='</div>';
+ }
+ document.getElementById('app').innerHTML=h;
+}
+function resetData(){if(confirm('Är du säker? All historik och sparade pass tas bort.')){localStorage.removeItem(KEY);location.reload()}}
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+render();
+</script>
+</body></html>
